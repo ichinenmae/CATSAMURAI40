@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hop Deliver! - Mobile Fix</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Press Start 2P', cursive;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(to bottom, #020205, #101025, #1a1a3a);
+            overflow: hidden;
+        }
+
+        /* Wrapper to hold canvas and UI. 
+           This will be scaled by JS to fit the screen.
+        */
+        #game-wrapper {
+            position: relative;
+            width: 800px;  /* Fixed Logic Width */
+            height: 600px; /* Fixed Logic Height */
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            background-color: #000;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* UI Overlay */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            color: #fff;
+            font-size: 10px;
+            text-shadow: 2px 2px #000;
+            z-index: 10;
+        }
+
+        .score-box span { color: #ffd700; }
+        .promo-box span { color: #00ffcc; }
+        .time-box { 
+            color: #ff4444; 
+            font-size: 12px; 
+            margin-top: 5px; 
+            background: rgba(0,0,0,0.5);
+            padding: 6px;
+            border-radius: 4px;
+        }
+
+        /* Modal / Message Area */
+        #message-area {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            pointer-events: auto;
+            background: rgba(0,0,0,0.95);
+            padding: 30px;
+            border: 4px solid #fff;
+            min-width: 320px;
+            max-width: 90%;
+            z-index: 100;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 18px;
+            color: #ff4444;
+            text-shadow: 2px 2px #000;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .result-container {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .result-item {
+            opacity: 0;
+            text-align: left;
+            font-size: 10px;
+            color: #eee;
+            margin-bottom: 8px;
+            transition: opacity 0.3s;
+            border-bottom: 1px dashed #333;
+            padding-bottom: 4px;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .result-total {
+            opacity: 0;
+            font-size: 16px;
+            color: #ffd700;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #fff;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+        }
+
+        .btn {
+            background: #ff00cc;
+            color: white;
+            border: 4px solid #fff;
+            padding: 15px 25px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            line-height: 1.6;
+            margin-top: 10px;
+            text-transform: uppercase;
+        }
+
+        .btn:hover { background: #ff33dd; }
+        .btn:active { transform: scale(0.95); }
+
+        /* Effects Overlay (Fullscreen) */
+        .scanlines {
+            position: fixed;
+            left: 0; top: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.1) 50%,
+                rgba(0,0,0,0.1)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 90;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <!-- Wrapper for scaling -->
+    <div id="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
+        
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="score-box">
+                    SCORE: <span id="scoreDisplay">0</span><br>
+                    <div class="promo-box" style="margin-top:5px">PROMO: <span id="promoDisplay">0</span></div>
+                </div>
+                <div class="status-box" style="text-align: right;">
+                    <div id="timeDisplay" class="time-box">TIME: 0m</div>
+                    DELIVERIES: <span id="deliveryDisplay">0</span><br>
+                    CARGO: <span id="itemDisplay">NONE</span><br>
+                    <span id="shieldDisplay" style="color: #00ffff; font-size: 10px; display: none;">SHIELD ON</span>
+                </div>
+            </div>
+            
+            <div id="message-area">
+                <h1 style="color: #00ffcc;">SAMURAI CAT No.40</h1>
+                <p style="font-size:10px; line-height:1.8; color:#ccc; margin-bottom:20px; text-align: center;">
+                    DRIVE THE YELLOW VAN!<br>
+                    [TAP] JUMP (DOUBLE)<br>
+                    [HOLD] BRAKE<br>
+                    <span style="color: #00ffff;">GET CHIP FOR SHIELD!</span><br>
+                    <span style="color: #ff4444;">AVOID ROUND DOORS!</span>
+                </p>
+                <button class="btn" id="startBtn">GO ONLINE</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="scanlines"></div>
+</div>
+
+<script>
+/**
+ * --- Game Elements & Initialization ---
+ */
+const gameWrapper = document.getElementById('game-wrapper');
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const uiScore = document.getElementById('scoreDisplay');
+const uiPromo = document.getElementById('promoDisplay');
+const uiDelivery = document.getElementById('deliveryDisplay');
+const uiItem = document.getElementById('itemDisplay');
+const uiShield = document.getElementById('shieldDisplay');
+const uiTime = document.getElementById('timeDisplay');
+const msgArea = document.getElementById('message-area');
+const startBtn = document.getElementById('startBtn');
+
+// Fixed Game Resolution
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
+
+/**
+ * --- Audio System ---
+ */
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+let masterGain;
+let bgmLoopId;
+let audioSafe = false;
+
+let sirenOsc = null, sirenGain = null;
+let ufoOsc = null, ufoGain = null;
+
+const melodyNormal = [
+    {f: 523.25, d: 0.2}, {f: 587.33, d: 0.2}, {f: 659.25, d: 0.2}, {f: 523.25, d: 0.2},
+    {f: 659.25, d: 0.2}, {f: 783.99, d: 0.4}, {f: 698.46, d: 0.2}, {f: 659.25, d: 0.2}
+];
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(0.3, audioCtx.currentTime); 
+        masterGain.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playSound(type) {
+    if (!audioCtx || !audioSafe) return;
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(masterGain);
+
+    const playEnv = (atk, dec, vol) => {
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(vol, now + atk);
+        gain.gain.linearRampToValueAtTime(0, now + atk + dec);
+        osc.start(now); osc.stop(now + atk + dec);
+    };
+
+    switch (type) {
+        case 'jump':
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.linearRampToValueAtTime(400, now + 0.1);
+            playEnv(0.01, 0.1, 0.1);
+            break;
+        case 'coin':
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1200, now + 0.05);
+            playEnv(0.01, 0.1, 0.1);
+            break;
+        case 'deliver':
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(440, now);
+            osc.frequency.linearRampToValueAtTime(880, now + 0.2);
+            playEnv(0.02, 0.3, 0.15);
+            break;
+        case 'penalty':
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+            playEnv(0.01, 0.3, 0.2);
+            break;
+        case 'crash':
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+            playEnv(0.01, 0.5, 0.2);
+            break;
+        case 'miss': 
+            const cOsc = audioCtx.createOscillator();
+            const cGain = audioCtx.createGain();
+            cOsc.type = 'sawtooth';
+            cOsc.frequency.setValueAtTime(150, now);
+            cOsc.frequency.exponentialRampToValueAtTime(10, now + 0.3);
+            cGain.gain.setValueAtTime(0.3, now);
+            cGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            cOsc.connect(cGain); cGain.connect(masterGain);
+            cOsc.start(now); cOsc.stop(now + 0.3);
+
+            const dOsc = audioCtx.createOscillator();
+            const dGain = audioCtx.createGain();
+            dOsc.type = 'square';
+            dOsc.frequency.setValueAtTime(800, now + 0.1);
+            dOsc.frequency.linearRampToValueAtTime(100, now + 0.6);
+            dGain.gain.setValueAtTime(0.1, now + 0.1);
+            dGain.gain.linearRampToValueAtTime(0, now + 0.6);
+            dOsc.connect(dGain); dGain.connect(masterGain);
+            dOsc.start(now + 0.1); dOsc.stop(now + 0.6);
+            break;
+        case 'edge':
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1500, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+            playEnv(0.01, 0.15, 0.15);
+            break;
+        case 'quest':
+            [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.frequency.value = f;
+                o.connect(g); g.connect(masterGain);
+                g.gain.setValueAtTime(0, now + i*0.1);
+                g.gain.linearRampToValueAtTime(0.1, now + i*0.1 + 0.05);
+                g.gain.linearRampToValueAtTime(0, now + i*0.1 + 0.3);
+                o.start(now + i*0.1); o.stop(now + i*0.1 + 0.3);
+            });
+            break;
+        case 'shield':
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(440, now);
+            osc.frequency.linearRampToValueAtTime(880, now + 0.2);
+            playEnv(0.01, 0.2, 0.1);
+            break;
+        case 'safe':
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(220, now);
+            osc.frequency.linearRampToValueAtTime(880, now + 0.1);
+            playEnv(0.01, 0.2, 0.1);
+            break;
+        case 'tick':
+            osc.type = 'square';
+            osc.frequency.value = 1200;
+            playEnv(0.005, 0.05, 0.05);
+            break;
+        case 'total':
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1760, now + 0.1);
+            playEnv(0.01, 0.4, 0.1);
+            break;
+        case 'stomp':
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+            playEnv(0.005, 0.1, 0.2);
+            break;
+    }
+}
+
+async function startBGM() {
+    initAudio();
+    stopBGM();
+    
+    let nextNoteTime = audioCtx.currentTime + 0.1;
+    let noteIdx = 0;
+
+    function schedule() {
+        while (nextNoteTime < audioCtx.currentTime + 0.5) {
+            if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER' && gameState !== 'COUNTDOWN') return; 
+            
+            if (gameState === 'PLAYING' || gameState === 'COUNTDOWN') {
+                const note = melodyNormal[noteIdx % melodyNormal.length];
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.value = note.f;
+                
+                gain.gain.setValueAtTime(0, nextNoteTime);
+                gain.gain.linearRampToValueAtTime(0.05, nextNoteTime + 0.02);
+                gain.gain.linearRampToValueAtTime(0, nextNoteTime + note.d);
+                
+                osc.connect(gain); gain.connect(masterGain);
+                osc.start(nextNoteTime); osc.stop(nextNoteTime + note.d);
+                
+                nextNoteTime += note.d;
+                noteIdx++;
+            } else {
+                nextNoteTime += 0.5;
+            }
+        }
+        bgmLoopId = setTimeout(schedule, 200);
+    }
+    schedule();
+}
+
+function stopBGM() {
+    clearTimeout(bgmLoopId);
+    stopContinuousSounds();
+}
+
+function updateContinuousSounds(closestPoliceDist, hasUfo) {
+    if (!audioCtx || !audioSafe || gameState !== 'PLAYING') {
+        stopContinuousSounds();
+        return;
+    }
+    const now = audioCtx.currentTime;
+
+    // --- Police Siren ---
+    if (closestPoliceDist !== null) {
+        if (!sirenOsc) {
+            sirenOsc = audioCtx.createOscillator();
+            sirenGain = audioCtx.createGain();
+            sirenOsc.type = 'triangle';
+            sirenGain.gain.setValueAtTime(0, now);
+            sirenOsc.connect(sirenGain); sirenGain.connect(masterGain);
+            sirenOsc.start();
+        }
+        const freq = 600 + Math.sin(now * 10) * 200; 
+        sirenOsc.frequency.setTargetAtTime(freq, now, 0.05);
+        const distRatio = Math.max(0, 1 - (Math.abs(closestPoliceDist) / 1000));
+        const targetVol = distRatio * 0.05;
+        sirenGain.gain.setTargetAtTime(targetVol, now, 0.1);
+    } else {
+        if (sirenGain) {
+            sirenGain.gain.setTargetAtTime(0, now, 0.1);
+            if (sirenGain.gain.value < 0.001) { sirenOsc.stop(); sirenOsc = null; sirenGain = null; }
+        }
+    }
+
+    // --- UFO Sound ---
+    if (hasUfo) {
+        if (!ufoOsc) {
+            ufoOsc = audioCtx.createOscillator();
+            ufoGain = audioCtx.createGain();
+            ufoOsc.type = 'sawtooth';
+            ufoGain.gain.setValueAtTime(0, now);
+            ufoOsc.connect(ufoGain); ufoGain.connect(masterGain);
+            ufoOsc.start();
+        }
+        const freq = 150 + Math.sin(now * 20) * 50;
+        ufoOsc.frequency.setTargetAtTime(freq, now, 0.05);
+        ufoGain.gain.setTargetAtTime(0.02, now, 0.1);
+    } else {
+        if (ufoGain) {
+            ufoGain.gain.setTargetAtTime(0, now, 0.1);
+            if (ufoGain.gain.value < 0.001) { ufoOsc.stop(); ufoOsc = null; ufoGain = null; }
+        }
+    }
+}
+
+function stopContinuousSounds() {
+    if (sirenOsc) { try { sirenOsc.stop(); } catch(e){} sirenOsc = null; sirenGain = null; }
+    if (ufoOsc) { try { ufoOsc.stop(); } catch(e){} ufoOsc = null; ufoGain = null; }
+}
+
+/**
+ * --- Game Constants & State ---
+ */
+const GRAVITY = 0.6;
+const JUMP_FORCE = -12;
+const DOUBLE_JUMP_FORCE = -13;
+const AUTO_BOUNCE = -4;
+const MAX_ITEM = 3;
+const HOLD_THRESHOLD = 150; 
+
+// Game Variables
+let gameState = 'START';
+let frame = 0;
+let speed = 5;
+let score = 0;
+let promoScore = 0;
+let deliveryCount = 0;
+let totalDistance = 0;
+
+// Entities
+let platforms = [];
+let items = [];
+let enemies = [];
+let floatingTexts = [];
+let stars = [];
+let particles = [];
+let bagRanks = [];
+
+// Input State
+let isHolding = false;
+let holdStartTime = 0;
+let holdPending = false;
+
+// Effects
+let screenShake = 0;
+let flashOpacity = 0;
+let flashColor = '#fff';
+let hitStopFrames = 0;
+let deathReason = "";
+let countdown = 0;
+
+function resize() {
+    // 1. Set fixed internal resolution
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
+
+    // 2. Calculate scaling factor to fit window while maintaining aspect ratio
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    // Calculate scale for width and height fit
+    const scaleX = windowWidth / GAME_WIDTH;
+    const scaleY = windowHeight / GAME_HEIGHT;
+    
+    // Use the smaller scale to ensure it fits entirely
+    const scale = Math.min(scaleX, scaleY);
+
+    // 3. Apply scale transform to wrapper
+    // This scales BOTH the canvas and the UI overlay together
+    gameWrapper.style.transform = `scale(${scale})`;
+    
+    // Optional: If you want to center specifically or adjust margins if needed
+    // The #game-container flex rules already handle centering.
+
+    initStars();
+}
+
+function initStars() {
+    stars = [];
+    for (let i = 0; i < 50; i++) {
+        stars.push({
+            x: Math.random() * GAME_WIDTH,
+            y: Math.random() * GAME_HEIGHT,
+            size: Math.random() * 2,
+            speed: Math.random() * 0.5 + 0.1
+        });
+    }
+}
+
+function triggerFlash(color, shake) {
+    screenShake = shake;
+    flashOpacity = 0.6;
+    flashColor = color;
+    hitStopFrames = 5;
+}
+
+function triggerDamageEffects() {
+    screenShake = 20;
+    flashOpacity = 0.6;
+    flashColor = '#ff0000';
+    hitStopFrames = 15;
+}
+
+function createParticles(x, y, count, color) {
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: x, y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10 - 5,
+            life: 1.0, color: color, size: Math.random() * 4 + 2
+        });
+    }
+}
+
+function getTimeString() {
+    const pixelsPerMinute = 640;
+    const totalMinutes = Math.floor(totalDistance / pixelsPerMinute);
+    
+    if (totalMinutes < 60) return `TIME: ${totalMinutes}m`;
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return `TIME: ${h}h ${m}m`;
+}
+
+function getTimeInMinutes() {
+    const pixelsPerMinute = 640;
+    return Math.floor(totalDistance / pixelsPerMinute);
+}
+
+function getRankColor(rank) {
+    switch(rank) {
+        case 'bad': return '#aaaaaa'; 
+        case 'normal': return '#ffffff'; 
+        case 'good': return '#55ffff'; 
+        case 'god': return '#ffd700'; 
+        case 'legend': return `hsl(${frame * 5 % 360}, 100%, 70%)`; 
+        default: return '#fff';
+    }
+}
+
+function getRewardByRank(rank) {
+    let min, max;
+    switch(rank) {
+        case 'bad': min = 300; max = 450; break;
+        case 'normal': min = 500; max = 1200; break;
+        case 'good': min = 1250; max = 5000; break;
+        case 'god': min = 5050; max = 9000; break;
+        case 'legend': min = 9050; max = 10000; break;
+        default: min = 500; max = 1200;
+    }
+    return Math.floor((min + Math.random() * (max - min)) / 50) * 50;
+}
+
+function drawHeadlight(ctx, x, y, angle, range, width, color) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.globalCompositeOperation = 'screen';
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, range);
+    grad.addColorStop(0, color);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    const topAngle = -0.15; 
+    const bottomAngle = Math.PI / 4; 
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, range, topAngle, bottomAngle);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawBag(ctx, x, y, scale = 1, rank = 'normal') {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.strokeStyle = '#ddd'; 
+    ctx.lineWidth = 2;
+    ctx.beginPath(); 
+    ctx.moveTo(-4, -8); 
+    ctx.bezierCurveTo(-4, -14, 4, -14, 4, -8); 
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.beginPath(); 
+    ctx.moveTo(-6, -8); 
+    ctx.quadraticCurveTo(-9, 0, -7, 8); 
+    ctx.quadraticCurveTo(0, 10, 7, 8); 
+    ctx.quadraticCurveTo(9, 0, 6, -8); 
+    ctx.closePath(); 
+    ctx.fill();
+    ctx.fillStyle = getRankColor(rank); 
+    ctx.globalAlpha = 0.8; 
+    ctx.beginPath(); 
+    ctx.arc(0, 3, 4, 0, Math.PI*2); 
+    ctx.fill();
+    ctx.restore();
+}
+
+function drawWrongDoor(ctx, x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Arch frame
+    ctx.fillStyle = '#634';
+    ctx.beginPath();
+    ctx.moveTo(0, 45);
+    ctx.lineTo(30, 45);
+    ctx.lineTo(30, 15);
+    ctx.arc(15, 15, 15, 0, Math.PI, true); 
+    ctx.lineTo(0, 45);
+    ctx.fill();
+    // Door body
+    ctx.fillStyle = '#a64';
+    ctx.beginPath();
+    ctx.moveTo(2, 43);
+    ctx.lineTo(28, 43);
+    ctx.lineTo(28, 15);
+    ctx.arc(15, 15, 13, 0, Math.PI, true);
+    ctx.lineTo(2, 43);
+    ctx.fill();
+    // Knob
+    ctx.fillStyle = '#ff0';
+    ctx.beginPath();
+    ctx.arc(22, 25, 2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+}
+
+/**
+ * --- Entities ---
+ */
+const player = {
+    x: 100, y: 200, w: 50, h: 34, vy: 0, jumpCount: 0, rotation: 0,
+    flashTimer: 0, shield: false, state: 'ALIVE', deathTimer: 0, targetX: 100,
+    
+    update() {
+        if (hitStopFrames > 0) return;
+
+        // Revive Sequence
+        if (gameState === 'REVIVE') {
+            this.x += (this.targetX - this.x) * 0.1;
+            this.y += (200 - this.y) * 0.1; 
+            platforms.forEach(p => p.x += 15);
+            if (Math.abs(this.x - this.targetX) < 5 && platforms.some(p => p.x < this.x && p.x + p.w > this.x)) {
+                this.x = this.targetX;
+                this.y = 200;
+                this.vy = 0;
+                this.rotation = 0;
+                startCountdown();
+            }
+            return;
+        }
+
+        if (this.state === 'DYING') {
+            this.deathTimer++;
+            if (this.deathTimer > 15) { 
+                if (this.deathTimer === 16) this.vy = -10;
+                this.vy += GRAVITY;
+                this.y += this.vy;
+                this.rotation += 0.2;
+            }
+            if (this.y > GAME_HEIGHT + 200) endGameUI();
+            return;
+        }
+
+        this.vy += GRAVITY;
+        this.y += this.vy;
+        this.rotation = this.vy * 0.02;
+        if (this.flashTimer > 0) this.flashTimer--;
+
+        // 落下判定
+        if (this.y > GAME_HEIGHT + 100) {
+            if (this.shield) {
+                this.useShield("RECOVERY...");
+                startReviveSequence();
+            } else {
+                startDeathSequence("FALL");
+            }
+        }
+
+        if (holdPending) {
+            if (Date.now() - holdStartTime > HOLD_THRESHOLD) {
+                isHolding = true;
+                holdPending = false;
+            }
+        }
+    },
+
+    jump() {
+        if (this.state !== 'ALIVE') return;
+        if (this.jumpCount < 2) {
+            this.checkEdgeBonus();
+            this.vy = this.jumpCount === 0 ? JUMP_FORCE : DOUBLE_JUMP_FORCE;
+            this.jumpCount++;
+            playSound('jump');
+        }
+    },
+
+    checkEdgeBonus() {
+        platforms.forEach(p => {
+            if (this.y + this.h >= p.y - 20 && this.y + this.h <= p.y + 30 &&
+                this.x + this.w > p.x && this.x < p.x + p.w) {
+                const distToEnd = (p.x + p.w) - (this.x + this.w);
+                if (distToEnd > -10 && distToEnd < 20) {
+                    speed += 0.2;
+                    this.flashTimer = 10;
+                    const bonus = 80 + Math.floor(Math.random() * 13) * 10;
+                    promoScore += bonus;
+                    addFloatingText(`PERFECT EDGE! +¥${bonus}`, this.x, this.y - 30, '#00ffff');
+                    playSound('edge');
+                }
+            }
+        });
+    },
+
+    useShield(msg) {
+        this.shield = false;
+        this.flashTimer = 120;
+        speed = 5;
+        playSound('safe');
+        triggerDamageEffects();
+        addFloatingText(msg || "SAFE!", this.x, this.y - 40, '#ff4444', true);
+    },
+
+    draw() {
+        if (this.state === 'ALIVE') {
+            drawHeadlight(ctx, this.x + this.w, this.y + this.h/2 + 2, this.rotation, 300, 0, 'rgba(255, 255, 180, 0.4)');
+        }
+
+        ctx.save();
+        ctx.translate(this.x + this.w/2, this.y + this.h/2);
+        ctx.rotate(this.rotation);
+
+        if (this.state === 'DYING') ctx.filter = 'grayscale(1)';
+        if (isHolding && frame % 4 < 2) ctx.globalAlpha = 0.5;
+
+        if (this.shield && this.state === 'ALIVE') {
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 35 + Math.sin(frame * 0.2) * 3, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        ctx.fillStyle = (this.flashTimer > 0 && this.flashTimer % 4 < 2) ? '#fff' : '#fcdb03';
+        ctx.beginPath();
+        ctx.rect(-25, -15, 40, 30);
+        ctx.rect(15, 0, 10, 15);
+        ctx.fill();
+        
+        ctx.fillStyle = '#222';
+        ctx.fillRect(-20, -10, 15, 10);
+        ctx.fillRect(5, -10, 10, 10);
+
+        ctx.fillStyle = '#111';
+        const bounce = (frame % 8 < 4 && this.state === 'ALIVE') ? 1 : 0;
+        ctx.beginPath(); ctx.arc(-15, 15+bounce, 6, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(15, 15+bounce, 6, 0, Math.PI*2); ctx.fill();
+
+        if (bagRanks.length > 0) {
+            bagRanks.forEach((rank, i) => {
+                drawBag(ctx, -20 + i * 10, -32, 0.6, rank);
+            });
+        }
+        ctx.restore();
+    }
+};
+
+class Platform {
+    constructor(x, y, w) { this.x = x; this.y = y; this.w = w; this.h = 600; }
+    update() {
+        if (hitStopFrames > 0 || gameState === 'REVIVE' || gameState === 'COUNTDOWN') return;
+        const s = (isHolding || player.state === 'DYING') ? speed * 0.1 : speed;
+        this.x -= s;
+        if (player.state === 'ALIVE') totalDistance += s;
+    }
+    draw() {
+        ctx.fillStyle = '#444'; ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = '#222'; ctx.fillRect(this.x, this.y + 20, this.w, this.h); 
+        ctx.save();
+        ctx.beginPath(); ctx.rect(this.x, this.y, this.w, 20); ctx.clip();
+        ctx.fillStyle = '#666';
+        for(let tx = 0; tx < this.w; tx += 40) ctx.fillRect(this.x + tx, this.y + 8, 20, 4);
+        ctx.restore();
+    }
+}
+
+class Item {
+    constructor(x, y, type) { 
+        this.x = x; this.y = y; this.type = type; 
+        this.w = 30; this.h = 30; this.collected = false;
+        if (type === 'shop') {
+            const r = Math.random();
+            if (r < 0.5) this.rank = 'normal';
+            else if (r < 0.7) this.rank = 'bad';
+            else if (r < 0.85) this.rank = 'good';
+            else if (r < 0.95) this.rank = 'god';
+            else this.rank = 'legend';
+        }
+    }
+    update() {
+        if (hitStopFrames > 0 || gameState === 'REVIVE' || gameState === 'COUNTDOWN') return;
+        this.x -= (isHolding || player.state === 'DYING') ? speed * 0.1 : speed;
+    }
+    draw() {
+        if (this.collected) return;
+        const bob = Math.sin(frame * 0.1) * 3;
+        if (this.type === 'shop') {
+            drawBag(ctx, this.x + 15, this.y + 15 + bob, 1.5, this.rank);
+        } else if (this.type === 'home') {
+            ctx.fillStyle = '#634'; ctx.fillRect(this.x, this.y, 30, 45);
+            ctx.fillStyle = '#a64'; ctx.fillRect(this.x + 2, this.y + 2, 26, 41);
+            ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(this.x + 22, this.y + 25, 2, 0, Math.PI*2); ctx.fill();
+        } else if (this.type === 'wrong_home') {
+            drawWrongDoor(ctx, this.x, this.y);
+        } else if (this.type === 'shield') {
+            ctx.save(); ctx.translate(this.x + 15, this.y + 15 + bob);
+            ctx.fillStyle = '#00ffff'; 
+            ctx.beginPath(); ctx.moveTo(0, 10); ctx.lineTo(10, -5); ctx.lineTo(0, -10); ctx.lineTo(-10, -5); ctx.fill();
+            ctx.restore();
+        }
+    }
+}
+
+class Enemy {
+    constructor(x, y, type) {
+        this.x = x; this.y = y; this.type = type; 
+        this.w = 50; this.h = 30;
+        this.vy = 0; this.onGround = false;
+        this.extraSpeed = (type === 'police') ? 0.5 : 1.2;
+        this.dir = -1; 
+        this.moveSpeed = 2.0;
+        this.policeRot = 0;
+        this.stunned = false;
+        this.stunTimer = 0;
+    }
+    update() {
+        if (hitStopFrames > 0 || gameState === 'REVIVE' || gameState === 'COUNTDOWN') return;
+        const s = (isHolding || player.state === 'DYING') ? speed * 0.1 : speed;
+        
+        if (this.stunned) {
+            this.stunTimer--;
+            if (this.stunTimer <= 0) this.stunned = false;
+            this.x -= s;
+            return;
+        }
+        
+        if (this.type === 'police') {
+            this.vy += GRAVITY;
+            this.y += this.vy;
+            this.onGround = false;
+            let myPlatform = null;
+            platforms.forEach(p => {
+                if (this.x + this.w/2 > p.x && this.x + this.w/2 < p.x + p.w &&
+                    this.y + this.h >= p.y - 5 && this.y + this.h <= p.y + 40) {
+                    myPlatform = p;
+                }
+            });
+            if (myPlatform) {
+                this.y = myPlatform.y - this.h;
+                this.vy = 0;
+                this.onGround = true;
+                const nextX = this.x + (this.dir * this.moveSpeed);
+                if (nextX < myPlatform.x || nextX + this.w > myPlatform.x + myPlatform.w) {
+                    this.dir *= -1; 
+                }
+            }
+            this.x += (this.dir * this.moveSpeed) - s;
+            this.policeRot = this.onGround ? 0 : this.vy * 0.02;
+        } else {
+            this.x -= s + 1.2;
+            this.y += Math.sin(frame * 0.05) * 2;
+        }
+    }
+    draw() {
+        if (this.stunned) {
+            ctx.save();
+            ctx.translate(this.x + this.w/2, this.y + this.h);
+            ctx.scale(1.2, 0.5);
+            ctx.translate(-(this.x + this.w/2), -(this.y + this.h));
+        }
+
+        if (this.type === 'police') {
+            const lightAngle = this.dir === -1 ? Math.PI : 0;
+            const lightX = this.dir === -1 ? this.x + 10 : this.x + this.w - 10;
+            if (!this.stunned) drawHeadlight(ctx, lightX, this.y + 15, lightAngle, 200, 0.94, 'rgba(255,255,255,0.4)');
+            ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2); ctx.rotate(this.policeRot);
+            if (this.dir === 1) ctx.scale(-1, 1);
+            ctx.translate(-this.w/2, -this.h/2);
+            ctx.fillStyle = '#000'; ctx.fillRect(0, 15, 60, 15);
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(10, 15); ctx.lineTo(15, 0); ctx.lineTo(45, 0); ctx.lineTo(50, 15); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(12, 30, 6, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(48, 30, 6, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = (frame % 10 < 5) ? '#f00' : '#880000'; ctx.fillRect(25, -4, 10, 4);
+            ctx.fillStyle = '#fff'; ctx.font = '6px sans-serif'; ctx.fillText('POLICE', 18, 26);
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 12, 5, 8); 
+            ctx.restore();
+        } else {
+            if (!this.stunned) drawHeadlight(ctx, this.x + 25, this.y + 20, Math.PI/2, 150, 0.94, 'rgba(0,255,100,0.3)');
+            ctx.fillStyle = '#888'; 
+            ctx.beginPath(); ctx.ellipse(this.x + 25, this.y + 15, 25, 10, 0, 0, Math.PI*2); ctx.fill();
+            const domeGrad = ctx.createLinearGradient(this.x + 25, this.y, this.x + 25, this.y + 20);
+            domeGrad.addColorStop(0, '#ccf'); domeGrad.addColorStop(1, '#66a');
+            ctx.fillStyle = domeGrad;
+            ctx.beginPath(); ctx.arc(this.x + 25, this.y + 10, 10, Math.PI, 0); ctx.fill();
+        }
+
+        if (this.stunned) ctx.restore();
+    }
+}
+
+/**
+ * --- Spawning & Game Loop ---
+ */
+
+function spawnManager() {
+    if (hitStopFrames > 0 || player.state !== 'ALIVE' || gameState !== 'PLAYING') return;
+
+    // Time Check
+    const elapsedMinutes = getTimeInMinutes();
+
+    const lastP = platforms[platforms.length - 1];
+    if (lastP && lastP.x + lastP.w < GAME_WIDTH + 100) {
+        const lastY = lastP.y;
+        let gap = 80 + Math.random() * 80;
+        let width = 200 + Math.random() * 200;
+        let y = lastY;
+
+        if (Math.random() < 0.2) { 
+            y = lastY - 140 - Math.random() * 40;
+            gap = 60 + Math.random() * 40;
+        } else {
+            y = lastY + (Math.random() - 0.5) * 150;
+        }
+        y = Math.max(GAME_HEIGHT * 0.4, Math.min(GAME_HEIGHT * 0.8, y));
+
+        const p = new Platform(lastP.x + lastP.w + gap, y, width);
+        platforms.push(p);
+
+        // 画面内のアイテム数チェック
+        const itemOnScreen = items.some(it => !it.collected && it.x > -50 && it.x < GAME_WIDTH + 100);
+
+        if (!itemOnScreen) {
+             // チップ出現率 4%
+            if (!player.shield && Math.random() < 0.04) {
+                items.push(new Item(p.x + p.w/2, p.y - 60, 'shield'));
+            } else if (bagRanks.length < MAX_ITEM && Math.random() < 0.4) {
+                items.push(new Item(p.x + p.w/2, p.y - 40, 'shop'));
+            } else if (bagRanks.length > 0 && Math.random() < 0.3) {
+                // 30% chance to spawn wrong home instead of home
+                if (Math.random() < 0.3) {
+                    items.push(new Item(p.x + p.w/2, p.y - 45, 'wrong_home'));
+                } else {
+                    items.push(new Item(p.x + p.w/2, p.y - 45, 'home'));
+                }
+            }
+        }
+        
+        // パトカー出現: 61分以降 & スピード乗車時
+        if (elapsedMinutes > 61 && speed > 6.5 && width > 300 && Math.random() < 0.4) {
+            enemies.push(new Enemy(p.x + p.w/2, p.y - 30, 'police'));
+        }
+    }
+
+    // UFO出現: 31分以降
+    if (frame % 200 === 0 && elapsedMinutes > 31 && Math.random() < 0.3) {
+        enemies.push(new Enemy(GAME_WIDTH + 100, 50 + Math.random() * 200, 'ufo'));
+    }
+}
+
+function update() {
+    if (hitStopFrames > 0) {
+        hitStopFrames--;
+        return;
+    }
+    
+    if (gameState === 'REVIVE') {
+        player.update();
+        return;
+    }
+
+    if (platforms[0] && platforms[0].x + platforms[0].w < -100) platforms.shift();
+    items = items.filter(i => i.x > -100);
+    enemies = enemies.filter(e => e.x > -100);
+    particles = particles.filter(p => p.life > 0);
+
+    let closestPoliceDist = null;
+    let hasUfo = false;
+
+    platforms.forEach(p => p.update());
+    
+    let onGround = false;
+    if (player.state === 'ALIVE') {
+        platforms.forEach(p => {
+            if (player.vy >= 0 && 
+                player.x + player.w > p.x + 5 && 
+                player.x < p.x + p.w - 5 &&
+                player.y + player.h >= p.y && 
+                player.y + player.h <= p.y + 40) {
+                
+                player.y = p.y - player.h;
+                player.vy = AUTO_BOUNCE;
+                player.jumpCount = 0;
+                onGround = true;
+            }
+        });
+    }
+
+    items.forEach(it => {
+        it.update();
+        if (player.state === 'ALIVE' && !it.collected && 
+            Math.abs((player.x + player.w/2) - (it.x + it.w/2)) < 40 &&
+            Math.abs((player.y + player.h/2) - (it.y + it.h/2)) < 50) {
+            
+            it.collected = true;
+            if (it.type === 'shop' && bagRanks.length < MAX_ITEM) {
+                bagRanks.push(it.rank);
+                playSound('coin');
+                // 演出追加
+                createParticles(it.x + 15, it.y + 15, 10, '#ffffff'); 
+                addFloatingText("GET CARGO!", it.x, it.y - 40, "#ffd700"); 
+            } else if (it.type === 'shield') {
+                player.shield = true;
+                playSound('shield');
+                addFloatingText("SHIELD!", player.x, player.y - 40, "#00ffff");
+            } else if (it.type === 'home' && bagRanks.length > 0) {
+                // Delivery Logic
+                let earned = 0;
+                bagRanks.forEach(r => earned += getRewardByRank(r));
+                score += earned;
+                const oldTotal = deliveryCount;
+                deliveryCount += bagRanks.length;
+                if (Math.floor(deliveryCount / 10) > Math.floor(oldTotal / 10)) {
+                    const promo = 800 + Math.floor(Math.random() * 8) * 100;
+                    promoScore += promo;
+                    playSound('quest');
+                    addFloatingText(`QUEST CLEAR! +${promo}`, GAME_WIDTH/2, GAME_HEIGHT/2, "#00ffcc", true);
+                }
+                bagRanks = [];
+                playSound('deliver');
+                playSound('total');
+                createParticles(it.x + 15, it.y + 20, 20, '#ffd700');
+                createParticles(it.x + 15, it.y + 20, 10, '#ffffff');
+                triggerFlash('#ffff00', 0);
+                addFloatingText(`DELIVERED!`, it.x, it.y - 80, '#ffff00', true); 
+                addFloatingText(`+¥${earned.toLocaleString()}`, it.x, it.y - 50, '#fff');
+                if (earned >= 5000) {
+                    triggerFlash('#ff00cc', 10);
+                    addFloatingText("BIG MONEY!!", it.x, it.y - 110, "#ff00cc", true);
+                }
+            } else if (it.type === 'wrong_home' && bagRanks.length > 0) {
+                // Wrong Delivery Penalty
+                let penalty = 0;
+                bagRanks.forEach(r => penalty += getRewardByRank(r));
+                score = Math.max(0, score - penalty);
+                bagRanks = []; // Lost cargo
+                playSound('penalty');
+                triggerFlash('#ff0000', 10);
+                addFloatingText("WRONG DELIVERY!", it.x, it.y - 60, '#ff0000', true);
+                addFloatingText(`-¥${penalty.toLocaleString()}`, it.x, it.y - 40, '#ff4444');
+            }
+        }
+    });
+
+    enemies.forEach(en => {
+        en.update();
+        if (!en.stunned) {
+            if (en.type === 'police') {
+                const d = en.x - player.x;
+                if (d > 0 && (closestPoliceDist === null || d < closestPoliceDist)) closestPoliceDist = d;
+            }
+            if (en.type === 'ufo' && en.x > 0 && en.x < GAME_WIDTH) hasUfo = true;
+
+            if (player.state === 'ALIVE' && player.flashTimer === 0 &&
+                player.x < en.x + en.w - 5 && player.x + player.w > en.x + 5 &&
+                player.y < en.y + en.h - 5 && player.y + player.h > en.y + 5) {
+                
+                // 踏みつけ判定
+                const isStomp = player.vy > 0 && (player.y + player.h) < (en.y + en.h / 2 + 10);
+
+                if (isStomp) {
+                    player.vy = -10; 
+                    en.stunned = true;
+                    en.stunTimer = 60;
+                    playSound('stomp');
+                    createParticles(en.x + en.w/2, en.y, 5, '#fff');
+                    addFloatingText("STOMP!", en.x, en.y - 20, "#ffff00");
+                } else if (player.shield) {
+                    player.useShield();
+                    en.x = -1000; 
+                } else {
+                    startDeathSequence(en.type === 'police' ? "POLICE" : "UFO");
+                }
+            }
+        }
+    });
+
+    particles.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.vy += GRAVITY; p.life -= 0.02;
+    });
+
+    player.update();
+    updateContinuousSounds(closestPoliceDist, hasUfo);
+
+    floatingTexts.forEach((t, i) => {
+        t.y -= (t.isBig ? 1.5 : 1); t.life -= 0.015;
+        if (t.life <= 0) floatingTexts.splice(i, 1);
+    });
+
+    if (screenShake > 0) screenShake--;
+    if (flashOpacity > 0) flashOpacity -= 0.02;
+}
+
+function addFloatingText(txt, x, y, color, isBig = false) {
+    floatingTexts.push({ txt, x, y, color, isBig, life: 1.0 });
+}
+
+function startReviveSequence() {
+    gameState = 'REVIVE';
+    stopContinuousSounds();
+    const safeCheck = platforms.some(p => p.x < 100 && p.x + p.w > 100);
+    if (!safeCheck) {
+        platforms.unshift(new Platform(50, GAME_HEIGHT * 0.7, 400));
+    }
+}
+
+function startCountdown() {
+    gameState = 'COUNTDOWN';
+    countdown = 3;
+    const cdInterval = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+            clearInterval(cdInterval);
+            gameState = 'PLAYING';
+            speed = 5;
+        } else {
+            playSound('tick');
+        }
+    }, 1000);
+}
+
+function startDeathSequence(reason) {
+    if (player.state === 'DYING') return;
+    player.state = 'DYING';
+    player.deathTimer = 0;
+    deathReason = reason;
+    isHolding = false;
+    stopContinuousSounds();
+    stopBGM();
+    playSound('miss');
+    triggerDamageEffects();
+}
+
+// --- Render & Loops ---
+function draw() {
+    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.save();
+    if (screenShake > 0) ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+
+    drawBackground();
+    platforms.forEach(p => p.draw());
+    items.forEach(i => i.draw());
+    enemies.forEach(e => e.draw());
+    player.draw();
+
+    particles.forEach(p => {
+        ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    ctx.globalAlpha = 1.0;
+
+    floatingTexts.forEach(t => {
+        ctx.save();
+        ctx.globalAlpha = t.life;
+        ctx.fillStyle = t.color;
+        ctx.font = t.isBig ? '20px "Press Start 2P", "DotGothic16"' : '10px "Press Start 2P", "DotGothic16"';
+        ctx.textAlign = 'center';
+        let drawX = t.x;
+        if (t.isBig && t.txt.includes("QUEST")) drawX = GAME_WIDTH / 2;
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(t.txt, drawX, t.y);
+        ctx.fillText(t.txt, drawX, t.y);
+        ctx.restore();
+    });
+
+    if (gameState === 'COUNTDOWN') {
+        ctx.fillStyle = '#fff';
+        ctx.font = '40px "Press Start 2P"';
+        ctx.textAlign = 'center';
+        ctx.fillText(countdown > 0 ? countdown : "GO!", GAME_WIDTH/2, GAME_HEIGHT/2);
+    }
+
+    ctx.restore(); 
+
+    if (flashOpacity > 0) {
+        ctx.fillStyle = flashColor;
+        ctx.globalAlpha = flashOpacity;
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+function drawBackground() {
+    ctx.fillStyle = "#fff";
+    const scrollMult = (isHolding || player.state === 'DYING') ? 0.1 : 1.0;
+    stars.forEach(s => {
+        ctx.globalAlpha = Math.sin(frame * 0.05 + s.x) * 0.5 + 0.5;
+        ctx.fillRect(s.x, s.y, s.size, s.size);
+        s.x -= s.speed * scrollMult; if (s.x < 0) s.x = GAME_WIDTH;
+    });
+    ctx.globalAlpha = 1.0;
+    
+    // Moon
+    ctx.save();
+    ctx.translate(GAME_WIDTH - 80, 80);
+    ctx.rotate(-0.2);
+    ctx.fillStyle = "#ffffaa";
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(-10, -5, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
+async function showGameOverSequence(stats) {
+    const lines = [
+        { id: 'res-time', text: `TIME: ${stats.timeStr}` },
+        { id: 'res-count', text: `DELIVERIES: ${stats.count}` },
+        { id: 'res-base', text: `BASE: ¥${stats.base.toLocaleString()}` },
+        { id: 'res-promo', text: `PROMO: ¥${stats.promo.toLocaleString()}` },
+        { id: 'res-per-h', text: `EFFICIENCY: ${stats.perH}/h` },
+        { id: 'res-wage', text: `HOURLY: ¥${stats.wage.toLocaleString()}` }
+    ];
+
+    for (const line of lines) {
+        await new Promise(r => setTimeout(r, 400));
+        const el = document.getElementById(line.id);
+        if (el) {
+            el.innerText = line.text;
+            el.style.opacity = 1;
+            playSound('tick');
+        }
+    }
+
+    await new Promise(r => setTimeout(r, 700));
+    const totalEl = document.getElementById('res-total');
+    if (totalEl) {
+        totalEl.innerHTML = `TOTAL: ¥${stats.total.toLocaleString()}`;
+        totalEl.style.opacity = 1;
+        totalEl.style.transform = 'scale(1.1)';
+        playSound('total');
+    }
+
+    await new Promise(r => setTimeout(r, 600));
+    const btn = document.getElementById('restartBtn');
+    if (btn) btn.style.display = 'inline-block';
+}
+
+function endGameUI() {
+    if (gameState === 'GAMEOVER') return;
+    gameState = 'GAMEOVER';
+    stopContinuousSounds();
+    audioSafe = true;
+
+    const elapsedMinutes = getTimeInMinutes();
+    const hours = Math.max(0.1, elapsedMinutes / 60);
+    const perH = (deliveryCount / hours).toFixed(1);
+    const total = score + promoScore;
+    const wage = Math.floor(total / hours);
+
+    msgArea.innerHTML = `
+        <h1 style="color: #ff4444;">OFFLINE</h1>
+        <div class="result-container">
+            <div id="res-time" class="result-item"></div>
+            <div id="res-count" class="result-item"></div>
+            <div id="res-base" class="result-item"></div>
+            <div id="res-promo" class="result-item"></div>
+            <div id="res-per-h" class="result-item"></div>
+            <div id="res-wage" class="result-item"></div>
+            <div id="res-total" class="result-total"></div>
+        </div>
+        <button class="btn" id="restartBtn" style="display:none; background:#ff00cc;">GO ONLINE</button>
+    `;
+    msgArea.style.display = 'flex';
+    document.getElementById('restartBtn').onclick = initGame;
+
+    showGameOverSequence({
+        timeStr: getTimeString().replace('TIME: ', ''),
+        count: deliveryCount, base: score, promo: promoScore, perH: perH, wage: wage, total: total
+    });
+}
+
+function gameLoop() {
+    if (gameState === 'PLAYING' || gameState === 'REVIVE' || gameState === 'COUNTDOWN') {
+        spawnManager();
+        update();
+        draw();
+        uiScore.innerText = score.toLocaleString();
+        uiPromo.innerText = promoScore.toLocaleString();
+        uiDelivery.innerText = deliveryCount;
+        uiItem.innerText = `${bagRanks.length}/3`;
+        uiTime.innerText = getTimeString();
+        uiShield.style.display = player.shield ? 'inline' : 'none';
+        if (hitStopFrames === 0 && player.state === 'ALIVE' && gameState === 'PLAYING') {
+            frame++; speed += 0.0004;
+        }
+        requestAnimationFrame(gameLoop);
+    } else if (gameState === 'GAMEOVER') {
+        // Stop
+    }
+}
+
+function initGame() {
+    audioSafe = false; initAudio(); stopContinuousSounds();
+    gameState = 'PLAYING'; frame = 0; speed = 5; score = 0; promoScore = 0; deliveryCount = 0; totalDistance = 0;
+    bagRanks = []; items = []; enemies = []; platforms = []; floatingTexts = []; particles = [];
+    player.y = 200; player.vy = 0; player.jumpCount = 0; player.shield = false; player.state = 'ALIVE'; player.rotation = 0;
+    platforms.push(new Platform(0, GAME_HEIGHT * 0.7, 500));
+    initStars();
+    msgArea.style.display = 'none';
+    
+    startBGM(); 
+    startCountdown();
+    
+    setTimeout(() => { audioSafe = true; }, 200);
+    
+    gameLoop();
+}
+
+window.addEventListener('resize', resize);
+// Initial resize
+resize();
+
+startBtn.addEventListener('click', initGame);
+
+const handleStart = (e) => {
+    if (gameState !== 'PLAYING' || player.state !== 'ALIVE') return;
+    if (e.type === 'touchstart') e.preventDefault();
+    player.jump();
+    holdStartTime = Date.now();
+    holdPending = true;
+    isHolding = false;
+};
+const handleEnd = () => { isHolding = false; holdPending = false; };
+
+// Attach listeners to window/document to ensure touches work even with transforms
+const touchTarget = document; 
+
+touchTarget.addEventListener('mousedown', handleStart); 
+touchTarget.addEventListener('mouseup', handleEnd); 
+touchTarget.addEventListener('mouseleave', handleEnd);
+touchTarget.addEventListener('touchstart', handleStart, {passive: false}); 
+touchTarget.addEventListener('touchend', handleEnd);
+
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !e.repeat && gameState === 'PLAYING' && player.state === 'ALIVE') {
+        player.jump(); holdStartTime = Date.now(); holdPending = true;
+    }
+});
+window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isHolding = false; holdPending = false; } });
+</script>
+</body>
+</html>
