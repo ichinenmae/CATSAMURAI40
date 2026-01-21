@@ -388,9 +388,10 @@ async function startBGM() {
 
     function schedule() {
         while (nextNoteTime < audioCtx.currentTime + 0.5) {
-            if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER' && gameState !== 'COUNTDOWN') return; 
+            // Include REVIVE state so BGM loop continues during revival sequence
+            if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER' && gameState !== 'COUNTDOWN' && gameState !== 'REVIVE') return; 
             
-            if (gameState === 'PLAYING' || gameState === 'COUNTDOWN') {
+            if (gameState === 'PLAYING' || gameState === 'COUNTDOWN' || gameState === 'REVIVE') {
                 const note = melodyNormal[noteIdx % melodyNormal.length];
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
