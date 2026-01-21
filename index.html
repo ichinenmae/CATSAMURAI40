@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CATSAMURAI No.40</title>
+    <title>Hop Deliver! - Final Version</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
         /* DotGothic16 is removed as we are switching to English */
@@ -497,11 +497,36 @@ let hitStopFrames = 0;
 let deathReason = "";
 let countdown = 0;
 
+// function resize() {
+//    canvas.width = Math.min(window.innerWidth, 800);
+//    canvas.height = Math.min(window.innerHeight, 600);
+//    initStars();
+//}
+
 function resize() {
-    canvas.width = Math.min(window.innerWidth, 800);
-    canvas.height = Math.min(window.innerHeight, 600);
+    const maxWidth = 800;
+    const maxHeight = 600;
+    const aspectRatio = maxWidth / maxHeight;
+    
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    
+    // 縦位置の場合、高さに合わせて幅を調整
+    if (height > width) {
+        // 縦向き: 幅を基準にする
+        canvas.width = Math.min(width, maxWidth);
+        canvas.height = Math.min(canvas.width / aspectRatio, maxHeight);
+    } else {
+        // 横向き: 従来通り
+        canvas.width = Math.min(width, maxWidth);
+        canvas.height = Math.min(height, maxHeight);
+    }
+    
     initStars();
 }
+
+
+
 
 function initStars() {
     stars = [];
@@ -1379,5 +1404,4 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isHolding = false; holdPending = false; } });
 </script>
 </body>
-
 </html>
