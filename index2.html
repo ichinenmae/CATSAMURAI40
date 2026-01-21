@@ -38,12 +38,16 @@
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
             background-color: #000;
             transform-origin: center center; /* Ensure rotation happens from center */
+            
+            /* CRITICAL FIX: Prevent flexbox from squashing this element on small screens */
+            flex-shrink: 0; 
         }
 
         canvas {
             display: block;
-            width: 100%;
-            height: 100%;
+            /* CRITICAL FIX: Ensure canvas stays fixed size within wrapper */
+            width: 800px;
+            height: 600px;
             image-rendering: pixelated;
         }
 
