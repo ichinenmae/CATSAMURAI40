@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Hop Deliver! - Final Version</title>
+    <title>Hop Deliver! - Mobile Fix</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-        /* DotGothic16 is removed as we are switching to English */
 
         body {
             margin: 0;
@@ -29,8 +28,26 @@
             overflow: hidden;
         }
 
+        /* Wrapper to hold canvas and UI. 
+           This will be scaled by JS to fit the screen.
+        */
+        #game-wrapper {
+            position: relative;
+            width: 800px;  /* Fixed Logic Width */
+            height: 600px; /* Fixed Logic Height */
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            background-color: #000;
+            transform-origin: center center; /* Ensure rotation happens from center */
+            
+            /* CRITICAL FIX: Prevent flexbox from squashing this element on small screens */
+            flex-shrink: 0; 
+        }
+
         canvas {
-            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+            display: block;
+            /* CRITICAL FIX: Ensure canvas stays fixed size within wrapper */
+            width: 800px;
+            height: 600px;
             image-rendering: pixelated;
         }
 
@@ -106,7 +123,7 @@
         .result-item {
             opacity: 0;
             text-align: left;
-            font-size: 10px; /* English fits better smaller */
+            font-size: 10px;
             color: #eee;
             margin-bottom: 8px;
             transition: opacity 0.3s;
@@ -144,9 +161,10 @@
         .btn:hover { background: #ff33dd; }
         .btn:active { transform: scale(0.95); }
 
+        /* Effects Overlay (Fullscreen) */
         .scanlines {
             position: fixed;
-            left: 0; top: 0; width: 100%; height: 100%;
+            left: 0; top: 0; width: 100vw; height: 100vh;
             background: linear-gradient(
                 to bottom,
                 rgba(255,255,255,0),
@@ -158,44 +176,40 @@
             pointer-events: none;
             z-index: 90;
         }
-        .vignette {
-            position: fixed;
-            left: 0; top: 0; width: 100%; height: 100%;
-            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%);
-            pointer-events: none;
-            z-index: 91;
-        }
     </style>
 </head>
 <body>
 
 <div id="game-container">
-    <canvas id="gameCanvas"></canvas>
-    
-    <div id="ui-layer">
-        <div class="hud-top">
-            <div class="score-box">
-                SCORE: <span id="scoreDisplay">0</span><br>
-                <div class="promo-box" style="margin-top:5px">PROMO: <span id="promoDisplay">0</span></div>
-            </div>
-            <div class="status-box" style="text-align: right;">
-                <div id="timeDisplay" class="time-box">TIME: 0m</div>
-                DELIVERIES: <span id="deliveryDisplay">0</span><br>
-                CARGO: <span id="itemDisplay">NONE</span><br>
-                <span id="shieldDisplay" style="color: #00ffff; font-size: 10px; display: none;">SHIELD ON</span>
-            </div>
-        </div>
+    <!-- Wrapper for scaling -->
+    <div id="game-wrapper">
+        <canvas id="gameCanvas"></canvas>
         
-        <div id="message-area">
-            <h1 style="color: #00ffcc;">SAMURAI CAT No.40</h1>
-            <p style="font-size:10px; line-height:1.8; color:#ccc; margin-bottom:20px; text-align: center;">
-                DRIVE THE YELLOW VAN!<br>
-                [TAP] JUMP (DOUBLE)<br>
-                [HOLD] BRAKE<br>
-                <span style="color: #00ffff;">GET CHIP FOR SHIELD!</span><br>
-                <span style="color: #ff4444;">AVOID ROUND DOORS!</span>
-            </p>
-            <button class="btn" id="startBtn">GO ONLINE</button>
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="score-box">
+                    SCORE: <span id="scoreDisplay">0</span><br>
+                    <div class="promo-box" style="margin-top:5px">PROMO: <span id="promoDisplay">0</span></div>
+                </div>
+                <div class="status-box" style="text-align: right;">
+                    <div id="timeDisplay" class="time-box">TIME: 0m</div>
+                    DELIVERIES: <span id="deliveryDisplay">0</span><br>
+                    CARGO: <span id="itemDisplay">NONE</span><br>
+                    <span id="shieldDisplay" style="color: #00ffff; font-size: 10px; display: none;">SHIELD ON</span>
+                </div>
+            </div>
+            
+            <div id="message-area">
+                <h1 style="color: #00ffcc;">SAMURAI CAT No.40</h1>
+                <p style="font-size:10px; line-height:1.8; color:#ccc; margin-bottom:20px; text-align: center;">
+                    DRIVE THE YELLOW VAN!<br>
+                    [TAP] JUMP (DOUBLE)<br>
+                    [HOLD] BRAKE<br>
+                    <span style="color: #00ffff;">GET CHIP FOR SHIELD!</span><br>
+                    <span style="color: #ff4444;">AVOID ROUND DOORS!</span>
+                </p>
+                <button class="btn" id="startBtn">GO ONLINE</button>
+            </div>
         </div>
     </div>
     
@@ -206,6 +220,7 @@
 /**
  * --- Game Elements & Initialization ---
  */
+const gameWrapper = document.getElementById('game-wrapper');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const uiScore = document.getElementById('scoreDisplay');
@@ -216,6 +231,10 @@ const uiShield = document.getElementById('shieldDisplay');
 const uiTime = document.getElementById('timeDisplay');
 const msgArea = document.getElementById('message-area');
 const startBtn = document.getElementById('startBtn');
+
+// Fixed Game Resolution
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
 
 /**
  * --- Audio System ---
@@ -369,9 +388,10 @@ async function startBGM() {
 
     function schedule() {
         while (nextNoteTime < audioCtx.currentTime + 0.5) {
-            if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER' && gameState !== 'COUNTDOWN') return; 
+            // Include REVIVE state so BGM loop continues during revival sequence
+            if (gameState !== 'PLAYING' && gameState !== 'GAMEOVER' && gameState !== 'COUNTDOWN' && gameState !== 'REVIVE') return; 
             
-            if (gameState === 'PLAYING' || gameState === 'COUNTDOWN') {
+            if (gameState === 'PLAYING' || gameState === 'COUNTDOWN' || gameState === 'REVIVE') {
                 const note = melodyNormal[noteIdx % melodyNormal.length];
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
@@ -497,43 +517,46 @@ let hitStopFrames = 0;
 let deathReason = "";
 let countdown = 0;
 
-// function resize() {
-//    canvas.width = Math.min(window.innerWidth, 800);
-//    canvas.height = Math.min(window.innerHeight, 600);
-//    initStars();
-//}
-
 function resize() {
-    const maxWidth = 800;
-    const maxHeight = 600;
-    const aspectRatio = maxWidth / maxHeight;
-    
-    let width = window.innerWidth;
-    let height = window.innerHeight;
-    
-    // 縦位置の場合、高さに合わせて幅を調整
-    if (height > width) {
-        // 縦向き: 幅を基準にする
-        canvas.width = Math.min(width, maxWidth);
-        canvas.height = Math.min(canvas.width / aspectRatio, maxHeight);
+    // 1. Set fixed internal resolution
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
+
+    // 2. Determine Orientation and Scale
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const isPortrait = winH > winW;
+
+    let scale;
+
+    if (isPortrait) {
+        // PORTRAIT MODE: Rotate 90 degrees to fit width of game to height of screen
+        // We want GAME_WIDTH to fit into winH, and GAME_HEIGHT to fit into winW
+        const scaleX = winH / GAME_WIDTH;
+        const scaleY = winW / GAME_HEIGHT;
+        scale = Math.min(scaleX, scaleY);
+        
+        // Rotate 90 degrees and scale
+        gameWrapper.style.transform = `rotate(90deg) scale(${scale})`;
     } else {
-        // 横向き: 従来通り
-        canvas.width = Math.min(width, maxWidth);
-        canvas.height = Math.min(height, maxHeight);
+        // LANDSCAPE MODE: Standard scaling
+        const scaleX = winW / GAME_WIDTH;
+        const scaleY = winH / GAME_HEIGHT;
+        scale = Math.min(scaleX, scaleY);
+
+        // No rotation
+        gameWrapper.style.transform = `rotate(0deg) scale(${scale})`;
     }
-    
+
     initStars();
 }
-
-
-
 
 function initStars() {
     stars = [];
     for (let i = 0; i < 50; i++) {
         stars.push({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height,
+            x: Math.random() * GAME_WIDTH,
+            y: Math.random() * GAME_HEIGHT,
             size: Math.random() * 2,
             speed: Math.random() * 0.5 + 0.1
         });
@@ -711,7 +734,7 @@ const player = {
                 this.y += this.vy;
                 this.rotation += 0.2;
             }
-            if (this.y > canvas.height + 200) endGameUI();
+            if (this.y > GAME_HEIGHT + 200) endGameUI();
             return;
         }
 
@@ -721,7 +744,7 @@ const player = {
         if (this.flashTimer > 0) this.flashTimer--;
 
         // 落下判定
-        if (this.y > canvas.height + 100) {
+        if (this.y > GAME_HEIGHT + 100) {
             if (this.shield) {
                 this.useShield("RECOVERY...");
                 startReviveSequence();
@@ -971,7 +994,7 @@ function spawnManager() {
     const elapsedMinutes = getTimeInMinutes();
 
     const lastP = platforms[platforms.length - 1];
-    if (lastP && lastP.x + lastP.w < canvas.width + 100) {
+    if (lastP && lastP.x + lastP.w < GAME_WIDTH + 100) {
         const lastY = lastP.y;
         let gap = 80 + Math.random() * 80;
         let width = 200 + Math.random() * 200;
@@ -983,13 +1006,13 @@ function spawnManager() {
         } else {
             y = lastY + (Math.random() - 0.5) * 150;
         }
-        y = Math.max(canvas.height * 0.4, Math.min(canvas.height * 0.8, y));
+        y = Math.max(GAME_HEIGHT * 0.4, Math.min(GAME_HEIGHT * 0.8, y));
 
         const p = new Platform(lastP.x + lastP.w + gap, y, width);
         platforms.push(p);
 
         // 画面内のアイテム数チェック
-        const itemOnScreen = items.some(it => !it.collected && it.x > -50 && it.x < canvas.width + 100);
+        const itemOnScreen = items.some(it => !it.collected && it.x > -50 && it.x < GAME_WIDTH + 100);
 
         if (!itemOnScreen) {
              // チップ出現率 4%
@@ -1015,7 +1038,7 @@ function spawnManager() {
 
     // UFO出現: 31分以降
     if (frame % 200 === 0 && elapsedMinutes > 31 && Math.random() < 0.3) {
-        enemies.push(new Enemy(canvas.width + 100, 50 + Math.random() * 200, 'ufo'));
+        enemies.push(new Enemy(GAME_WIDTH + 100, 50 + Math.random() * 200, 'ufo'));
     }
 }
 
@@ -1085,7 +1108,7 @@ function update() {
                     const promo = 800 + Math.floor(Math.random() * 8) * 100;
                     promoScore += promo;
                     playSound('quest');
-                    addFloatingText(`QUEST CLEAR! +${promo}`, canvas.width/2, canvas.height/2, "#00ffcc", true);
+                    addFloatingText(`QUEST CLEAR! +${promo}`, GAME_WIDTH/2, GAME_HEIGHT/2, "#00ffcc", true);
                 }
                 bagRanks = [];
                 playSound('deliver');
@@ -1120,7 +1143,7 @@ function update() {
                 const d = en.x - player.x;
                 if (d > 0 && (closestPoliceDist === null || d < closestPoliceDist)) closestPoliceDist = d;
             }
-            if (en.type === 'ufo' && en.x > 0 && en.x < canvas.width) hasUfo = true;
+            if (en.type === 'ufo' && en.x > 0 && en.x < GAME_WIDTH) hasUfo = true;
 
             if (player.state === 'ALIVE' && player.flashTimer === 0 &&
                 player.x < en.x + en.w - 5 && player.x + player.w > en.x + 5 &&
@@ -1171,7 +1194,7 @@ function startReviveSequence() {
     stopContinuousSounds();
     const safeCheck = platforms.some(p => p.x < 100 && p.x + p.w > 100);
     if (!safeCheck) {
-        platforms.unshift(new Platform(50, canvas.height * 0.7, 400));
+        platforms.unshift(new Platform(50, GAME_HEIGHT * 0.7, 400));
     }
 }
 
@@ -1204,7 +1227,7 @@ function startDeathSequence(reason) {
 
 // --- Render & Loops ---
 function draw() {
-    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     ctx.save();
     if (screenShake > 0) ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
 
@@ -1227,7 +1250,7 @@ function draw() {
         ctx.font = t.isBig ? '20px "Press Start 2P", "DotGothic16"' : '10px "Press Start 2P", "DotGothic16"';
         ctx.textAlign = 'center';
         let drawX = t.x;
-        if (t.isBig && t.txt.includes("QUEST")) drawX = canvas.width / 2;
+        if (t.isBig && t.txt.includes("QUEST")) drawX = GAME_WIDTH / 2;
         ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(t.txt, drawX, t.y);
         ctx.fillText(t.txt, drawX, t.y);
         ctx.restore();
@@ -1237,7 +1260,7 @@ function draw() {
         ctx.fillStyle = '#fff';
         ctx.font = '40px "Press Start 2P"';
         ctx.textAlign = 'center';
-        ctx.fillText(countdown > 0 ? countdown : "GO!", canvas.width/2, canvas.height/2);
+        ctx.fillText(countdown > 0 ? countdown : "GO!", GAME_WIDTH/2, GAME_HEIGHT/2);
     }
 
     ctx.restore(); 
@@ -1245,7 +1268,7 @@ function draw() {
     if (flashOpacity > 0) {
         ctx.fillStyle = flashColor;
         ctx.globalAlpha = flashOpacity;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
         ctx.globalAlpha = 1.0;
     }
 }
@@ -1256,13 +1279,13 @@ function drawBackground() {
     stars.forEach(s => {
         ctx.globalAlpha = Math.sin(frame * 0.05 + s.x) * 0.5 + 0.5;
         ctx.fillRect(s.x, s.y, s.size, s.size);
-        s.x -= s.speed * scrollMult; if (s.x < 0) s.x = canvas.width;
+        s.x -= s.speed * scrollMult; if (s.x < 0) s.x = GAME_WIDTH;
     });
     ctx.globalAlpha = 1.0;
     
     // Moon
     ctx.save();
-    ctx.translate(canvas.width - 80, 80);
+    ctx.translate(GAME_WIDTH - 80, 80);
     ctx.rotate(-0.2);
     ctx.fillStyle = "#ffffaa";
     ctx.beginPath();
@@ -1368,7 +1391,7 @@ function initGame() {
     gameState = 'PLAYING'; frame = 0; speed = 5; score = 0; promoScore = 0; deliveryCount = 0; totalDistance = 0;
     bagRanks = []; items = []; enemies = []; platforms = []; floatingTexts = []; particles = [];
     player.y = 200; player.vy = 0; player.jumpCount = 0; player.shield = false; player.state = 'ALIVE'; player.rotation = 0;
-    platforms.push(new Platform(0, canvas.height * 0.7, 500));
+    platforms.push(new Platform(0, GAME_HEIGHT * 0.7, 500));
     initStars();
     msgArea.style.display = 'none';
     
@@ -1381,6 +1404,7 @@ function initGame() {
 }
 
 window.addEventListener('resize', resize);
+// Initial resize
 resize();
 
 startBtn.addEventListener('click', initGame);
@@ -1394,8 +1418,16 @@ const handleStart = (e) => {
     isHolding = false;
 };
 const handleEnd = () => { isHolding = false; holdPending = false; };
-canvas.addEventListener('mousedown', handleStart); canvas.addEventListener('mouseup', handleEnd); canvas.addEventListener('mouseleave', handleEnd);
-canvas.addEventListener('touchstart', handleStart, {passive: false}); canvas.addEventListener('touchend', handleEnd);
+
+// Attach listeners to window/document to ensure touches work even with transforms
+const touchTarget = document; 
+
+touchTarget.addEventListener('mousedown', handleStart); 
+touchTarget.addEventListener('mouseup', handleEnd); 
+touchTarget.addEventListener('mouseleave', handleEnd);
+touchTarget.addEventListener('touchstart', handleStart, {passive: false}); 
+touchTarget.addEventListener('touchend', handleEnd);
+
 window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.repeat && gameState === 'PLAYING' && player.state === 'ALIVE') {
         player.jump(); holdStartTime = Date.now(); holdPending = true;
