@@ -37,6 +37,7 @@
             height: 600px; /* Fixed Logic Height */
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
             background-color: #000;
+            transform-origin: center center; /* Ensure rotation happens from center */
         }
 
         canvas {
@@ -516,23 +517,31 @@ function resize() {
     canvas.width = GAME_WIDTH;
     canvas.height = GAME_HEIGHT;
 
-    // 2. Calculate scaling factor to fit window while maintaining aspect ratio
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    
-    // Calculate scale for width and height fit
-    const scaleX = windowWidth / GAME_WIDTH;
-    const scaleY = windowHeight / GAME_HEIGHT;
-    
-    // Use the smaller scale to ensure it fits entirely
-    const scale = Math.min(scaleX, scaleY);
+    // 2. Determine Orientation and Scale
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const isPortrait = winH > winW;
 
-    // 3. Apply scale transform to wrapper
-    // This scales BOTH the canvas and the UI overlay together
-    gameWrapper.style.transform = `scale(${scale})`;
-    
-    // Optional: If you want to center specifically or adjust margins if needed
-    // The #game-container flex rules already handle centering.
+    let scale;
+
+    if (isPortrait) {
+        // PORTRAIT MODE: Rotate 90 degrees to fit width of game to height of screen
+        // We want GAME_WIDTH to fit into winH, and GAME_HEIGHT to fit into winW
+        const scaleX = winH / GAME_WIDTH;
+        const scaleY = winW / GAME_HEIGHT;
+        scale = Math.min(scaleX, scaleY);
+        
+        // Rotate 90 degrees and scale
+        gameWrapper.style.transform = `rotate(90deg) scale(${scale})`;
+    } else {
+        // LANDSCAPE MODE: Standard scaling
+        const scaleX = winW / GAME_WIDTH;
+        const scaleY = winH / GAME_HEIGHT;
+        scale = Math.min(scaleX, scaleY);
+
+        // No rotation
+        gameWrapper.style.transform = `rotate(0deg) scale(${scale})`;
+    }
 
     initStars();
 }
